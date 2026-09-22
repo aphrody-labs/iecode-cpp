@@ -1,0 +1,8 @@
+{
+  "$comment": "The root manifest is the only dependency owner.",
+  "overlay-ports": [
+    "src/iecode-cpp/cmake/overlay-ports",
+    "src/winDS/cmake/overlay-ports"
+  ],
+  "overlay-triplets": ["src/winDS/cmake/overlay-triplets"]
+}
