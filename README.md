@@ -10,5 +10,8 @@ in the sibling `nie` workspace.
 - `src/iecode-cpp/`: C/C++ parsers, converters, CLI, decompilation helpers, and tests.
 - `cmake/`, `CMakeLists.txt`, `vcpkg.json`: native build configuration.
 - `bench/cpp/`: benchmark harness.
+- `mods/strikers2013-xtreme/`: Kamek/CodeWarrior PowerPC sources of the Inazuma Eleven GO
+  Strikers 2013 Xtreme mod. It is built with its own `build.py` toolchain, is outside the CMake
+  source glob, and its managed playlist helper lives in `src/IECODE/Gui/PlaylistMaker`.
 
 This repository contains no game dumps or generated VFS data.
