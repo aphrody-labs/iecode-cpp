@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(iecode VERSION 1.1.0 LANGUAGES C CXX)
+project(iecode VERSION 2026.9.29 LANGUAGES C CXX)
 
 # ── C++ / C standards ─────────────────────────────────────────────
 set(CMAKE_CXX_STANDARD 20)

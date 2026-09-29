@@ -4,5 +4,7 @@
     "src/iecode-cpp/cmake/overlay-ports",
     "cmake/overlay-ports"
   ],
-  "overlay-triplets": ["cmake/overlay-triplets"]
+  "overlay-triplets": [
+    "cmake/overlay-triplets"
+  ]
 }
