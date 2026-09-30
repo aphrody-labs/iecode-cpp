@@ -1,0 +1,8 @@
+build/
+build.ninja
+.ninja_deps
+.ninja_log
+*.nds
+*.dsl
+sdroot/
+compile_commands.json

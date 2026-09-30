@@ -1,0 +1,242 @@
+// SPDX-License-Identifier: ISC
+//
+// Copyright (c) 2008, Mukunda Johnson (mukunda@maxmod.org)
+// Copyright (c) 2025, Antonio Niño Díaz
+
+/****************************************************************************
+ *                                                          __              *
+ *                ____ ___  ____ __  ______ ___  ____  ____/ /              *
+ *               / __ '__ \/ __ '/ |/ / __ '__ \/ __ \/ __  /               *
+ *              / / / / / / /_/ />  </ / / / / / /_/ / /_/ /                *
+ *             /_/ /_/ /_/\__,_/_/|_/_/ /_/ /_/\____/\__,_/                 *
+ *                                                                          *
+ *                            ARM7 Definitions                              *
+ *                                                                          *
+ ****************************************************************************/
+
+/// @file maxmod7.h
+///
+/// @brief Global include of Maxmod for DS (ARM7 side).
+
+#ifdef ARM9
+#error "maxmod7.h is for ARM7!"
+#endif
+
+#ifndef MAXMOD_H__
+#define MAXMOD_H__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include <mm_types.h>
+#include <maxmod_common.h>
+
+// ***************************************************************************
+/// @defgroup nds_arm7_init NDS: ARM7 Initialization/Main Functions
+/// @{
+// ***************************************************************************
+
+/// Installs the Maxmod system on the ARM7 side.
+///
+/// Normally, this is the only function you need to call on ARM7.
+///
+/// @param fifo_channel
+///     FIFO communication channel to use. Must equal the channel the ARM9 side
+///     will be sending data to.  (usually FIFO_MAXMOD)
+void mmInstall(int fifo_channel);
+
+/// Lock audio channels to prevent Maxmod from using them.
+///
+/// This is for when you need to operate on the DS hardware channels directly.
+/// Note that if you use this function while music or sound effects are playing,
+/// any active notes that are using the channels to be locked will be cut.
+///
+/// @param bitmask
+///     Selection of channels to lock. Bit0 = Channel0, Bit1 = Channel1 ...
+///     Bit15 = Channel15
+void mmLockChannels(mm_word bitmask);
+
+/// Unlocks audio channels to allow Maxmod to use them.
+///
+/// This function can be used to restore channel usage to Maxmod when you are
+/// finished using certain channels.
+///
+/// Note that in the "Interpolated Audio" mode, channels **can not** be
+/// unlocked. To unlock channels in the interpolated mode you must reset the
+/// audio system. To reset the audio system, use mmSelectMode().
+///
+/// @param bitmask
+///     Selection of channels to unlock. Bit0 = Channel0, Bit1 = Channel1, Bit2
+///     = Channel2 ... Bit15 = Channel15
+void mmUnlockChannels(mm_word bitmask);
+
+/// Returns whether or not the system is initialized and ready for playback.
+///
+/// @return
+///     Non-zero if the system is initialized, zero otheriwse.
+mm_bool mmIsInitialized(void);
+
+/// Switches the audio mode for Maxmod DS.
+///
+/// Hardware mixing offers 16-channel audio with minimal CPU load.
+///
+/// Interpolated mixing extends the capability of the hardware channels by
+/// adding linear interpolation in software.
+///
+/// Extended mixing increases the channel count to 30 with software mixing.
+///
+/// Maxmod starts in mode A (hardware mixing).
+///
+/// @param mode
+///     New audio mode. Pass MM_MODE_A for complete hardware mixing, MM_MODE_B
+///     for interpolated mixing, or MM_MODE_C for extended mixing.
+void mmSelectMode(mm_mode_enum mode);
+
+/// This is the main routine-function that processes music and updates the sound
+/// output.
+///
+/// For DS (ARM7), this function is called automatically.
+void mmFrame(void);
+
+/// Returns the number of modules available in the soundbank.
+///
+/// @return
+///     The number of modules.
+mm_word mmGetModuleCount(void);
+
+/// Returns the number of samples available in the soundbank.
+///
+/// @note
+///     This number includes the samples used by all the songs in the soundbank,
+///     not just the sound effects in WAV format.
+///
+/// @return
+///     The number of samples.
+mm_word mmGetSampleCount(void);
+
+// ***************************************************************************
+/// @}
+/// @defgroup nds_arm7_streaming NDS: ARM7 Streaming
+/// @{
+// ***************************************************************************
+
+/// Opens an audio stream.
+///
+/// See the tutorials for more information.
+///
+/// Caution: If you have some heavy interrupt-routines that are enabled while
+/// calling this function, you may corrupt the stream. The function cannot
+/// disable interrupts internally because it requires the communications to be
+/// active.
+///
+/// @param stream
+///     Pointer to a structure containing information about how the stream will
+///     operate.
+/// @param wavebuffer
+///     Wave memory, must be aligned.
+/// @param workbuffer
+///     Work memory, must be aligned.
+void mmStreamOpen(mm_stream* stream, mm_addr wavebuffer, mm_addr workbuffer);
+
+/// Check buffering state and fill stream with data.
+///
+/// Requests will be made to your callback to fill parts of the wave buffer(s).
+/// This function only needs to be called manually if the stream isn't in
+/// auto-fill mode. This function shouldn't be used when the stream is
+/// automatically filled.
+void mmStreamUpdate(void);
+
+/// Close audio stream.
+void mmStreamClose(void);
+
+/// Get number of samples elapsed since the stream was opened.
+///
+/// The 32-bit value will wrap every 36 hours or so (at 32khz).
+///
+/// @return
+///     The nummber of samples.
+mm_word mmStreamGetPosition(void);
+
+/// Changes the volume of the audio stream.
+///
+/// @param volume
+///     New volume level. Ranges from 0 (silent) to 127 (normal).
+void mmStreamVolume(mm_byte volume);
+
+// ***************************************************************************
+/// @}
+/// @defgroup nds_arm7_reverb NDS: ARM7 Reverb
+/// @{
+// ***************************************************************************
+
+/// Enables the reverb system.
+///
+/// This function locks 2 channels (1 & 3) to reserve them for reverb output.
+/// This must be called before the configuration functions can be used.
+///
+/// If music is playing when this function is used, a note or two may be cut due
+/// to the locking.
+void mmReverbEnable(void);
+
+/// Configures the reverb system.
+///
+/// See the reverb tutorial for a full explanation of the configuration
+/// structure.
+///
+/// @param config
+///     Reverb configuration structure.
+void mmReverbConfigure(mm_reverb_cfg *config);
+
+/// Starts reverb output in the selected channels.
+///
+/// @param channels
+///     Reverb channel selection. Can use MMRC_LEFT or MMRC_RIGHT or (MMRC_LEFT
+///     | MMRC_RIGHT).
+void mmReverbStart(mm_reverbch channels);
+
+/// Stops reverb output for the selected channels.
+///
+/// Can select left output, right output, or both.
+///
+/// @param channels
+///     Reverb channel selection.
+void mmReverbStop(mm_reverbch channels);
+
+/// This calculates the amount of memory needed for the reverb buffer.
+///
+/// It calculates the reverb buffer size based on bit depth, delay and sampling
+/// rate.
+///
+/// @param bit_depth
+///     May be 8 or 16 to represent 8-bit or 16-bit bit-depth.
+/// @param sampling_rate
+///     Sampling rate in Hertz.
+/// @param delay
+///     Reverb delay value in milliseconds.
+///
+/// @return
+///     Amount of memory required, measured in words (32-bit units).
+static inline mm_word mmReverbBufferSize(mm_word bit_depth, mm_word sampling_rate, mm_word delay)
+{
+    if (bit_depth == 16)
+        return ((((sampling_rate * delay * 2) / 1000) + 3) & (~3)) / 4;
+    else
+        return ((((sampling_rate * delay) / 1000) + 3) & (~3)) / 4;
+}
+
+/// Disables the reverb system and restores the channels.
+///
+/// Note: In the interpolated audio mode, the channels cannot be restored by
+/// this function and the mixer must be reset instead.
+void mmReverbDisable(void);
+
+// ***************************************************************************
+/// @}
+// ***************************************************************************
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // MAXMOD_H__

@@ -1,8 +1,9 @@
 # `third_party/` — les sources tierces vendorisées
 
-Bibliothèques C/C++ **header-only**, copiées telles quelles et compilées dans le toolkit
-`iecode`. Elles sont ici, et non dans `vcpkg.json`, parce qu'un seul en-tête ne justifie
-pas un port.
+Ce dossier contient les petites bibliothèques C/C++ **header-only** compilées dans le toolkit
+`iecode`, ainsi que les sources upstream complètes conservées pour étudier et adapter des SDK
+homebrew et bibliothèques C. Les snapshots de SDK et Lua ne sont pas intégrés à la cible CMake
+hôte; leurs adaptateurs IECODE seront maintenus à part.
 
 | Chemin | Bibliothèque | Licence | Ce qu'on en fait |
 |---|---|---|---|
@@ -11,8 +12,8 @@ pas un port.
 | `mio/mio.hpp` | mio (mandreyel) | MIT | projection mémoire portable des gros fichiers |
 | `tinygltf/tiny_gltf.h` | TinyGLTF (Syoyo Fujita, Aurélien Chatelain) | MIT | écrire du glTF à l'export des modèles |
 
-Le texte complet de chaque licence est dans l'en-tête du fichier concerné, et l'attribution
-est reprise dans [`NOTICE`](../NOTICE).
+Le texte complet de chaque licence est dans l'en-tête du fichier concerné ou dans le fichier
+de licence local. L'inventaire central est [`THIRD_PARTY.md`](../../../THIRD_PARTY.md).
 
 ## Règles
 
@@ -21,7 +22,12 @@ est reprise dans [`NOTICE`](../NOTICE).
   en-tête d'enrobage, du côté d'`iecode`.
 - **Mettre à jour = remplacer le fichier, et rien d'autre**, puis relancer les tests du
   toolkit. Noter la version amont dans le même commit.
-- **Toute entrée nouvelle ici ajoute une ligne dans `NOTICE`.** Une bibliothèque
-  redistribuée sans attribution est un défaut de licence, pas un oubli de documentation.
+- **Toute entrée nouvelle ici ajoute une ligne dans `THIRD_PARTY.md`.** Une source redistribuée
+  sans attribution est un défaut de licence, pas un oubli de documentation.
 - Les dépendances qui *ne sont pas* copiées (Cargo, Bun, NuGet, vcpkg) n'ont rien à faire
   ici : elles se résolvent à la construction.
+- Les arbres upstream complets gardent leurs fichiers et licences d'origine. Leur dépôt,
+  révision et sous-modules sont consignés dans [`CONSOLE-SDKS.md`](CONSOLE-SDKS.md); les
+  adaptations IECODE restent hors de ces arbres.
+- Les révisions et licences des bibliothèques graphiques 3DS sont listées dans
+  [`3ds/CONSOLE-SDKS.md`](3ds/CONSOLE-SDKS.md).

@@ -1,0 +1,5 @@
+*.elf
+*.dsl
+*.nds
+build/
+compile_commands.json

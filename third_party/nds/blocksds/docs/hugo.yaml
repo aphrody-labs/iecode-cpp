@@ -1,0 +1,83 @@
+languageCode: 'en-us'
+
+baseURL: "http://localhost"
+title: "BlocksDS"
+theme: "hextra"
+
+pluralizeListTitles: false
+
+# Required if you want to render robots.txt template
+enableRobotsTXT: true
+
+markup:
+  goldmark:
+    renderer:
+      # Needed to add raw HTML to the homepage
+      unsafe: true
+  highlight:
+    noClasses: false
+    style: light
+
+menu:
+  main:
+    - identifier: documentation
+      name: Documentation
+      pageRef: /docs
+      weight: 1
+    - identifier: tutorial
+      name: Tutorial
+      pageRef: /tutorial
+      weight: 2
+    - name: Search
+      weight: 3
+      params:
+        type: search
+    - name: Theme Toggle
+      weight: 4
+      params:
+        type: theme-toggle
+        default: system
+        label: false
+    - name: Codeberg
+      url: "https://codeberg.org/blocksds"
+      params:
+        icon: codeberg
+
+  sidebar:
+    - name: External links
+      params:
+        type: separator
+      weight: 1
+    - name: "Wonderful Toolchain"
+      weight: 2
+      url: "https://wonderful.asie.pl"
+    - name: "GBATEK"
+      weight: 3
+      url: "https://problemkaputt.de/gbatek.htm"
+
+params:
+  theme:
+    # light | dark | system
+    default: light
+    displayToggle: true
+
+  navbar:
+    displayTitle: true
+    displayLogo: true
+    logo:
+      path: images/logo_notext.png
+      dark: images/logo_notext.png
+      link: /
+      width: 50
+      height: 50
+
+  footer:
+    enable: true
+    displayCopyright: true
+    displayPoweredBy: false
+    width: narrow
+
+security:
+  http:
+    urls:
+      - '(?i)^https?://[a-z]'

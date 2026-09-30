@@ -1,0 +1,8 @@
+# Generate background, 4 bpp mode, 16 palettes
+-gb -bt4 -p 16
+
+# Export GRF file
+-og
+
+# Set magenta as transparent
+-k FF00FF

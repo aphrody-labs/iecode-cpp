@@ -1,0 +1,200 @@
+// SPDX-FileNotice: Modified from the original version by the BlocksDS project, starting from 2023.
+//
+//! \file plum.cpp
+//!  Extra libplum stuff
+//! \date 20070226 - 20070226
+//! \author cearn
+
+#include <stdint.h>
+#include <stdio.h>
+
+#include <cldib.h>
+
+#include "cldib_core.h"
+#include "cldib_tools.h"
+#include "libplum.h"
+#include "logger.h"
+#include "plum.h"
+
+// TODO: The functions in this file don't consider the fact that the width of
+// the image doesn't match the pitch of a line in a CLDIB image. This needs to
+// be fixed.
+
+// ! Initialize libplum and related materials
+void plumInit()
+{
+	dib_set_load_proc(cldib_load);
+	dib_set_save_proc(cldib_save);
+}
+
+// === cldib -> LIBPLUM stuff ===
+
+#define CLDIB_PLUM_COLOR_FORMAT (PLUM_COLOR_32 | PLUM_ALPHA_INVERT)
+
+struct plum_image *dib2plum(const CLDIB *dib)
+{
+	if(dib == NULL)
+		return NULL;
+
+	struct plum_image *image = plum_new_image();
+	if(image == NULL)
+		return NULL;
+
+	// Clone the image so that we can convert it without modifying the original
+	CLDIB *tmp = dib_clone(dib);
+	if(tmp == NULL) {
+		plum_destroy_image(image);
+		return NULL;
+	}
+
+	dib_convert(tmp, dib_get_bpp(tmp) < 8 ? 8 : 32, 0, false);
+
+	image->width = dib_get_width(tmp);
+	image->height = dib_get_height(tmp);
+	image->color_format = CLDIB_PLUM_COLOR_FORMAT;
+	image->max_palette_index = 0;
+	image->frames = 1;
+
+	if (dib_get_bpp(tmp) == 32) {
+		image->data = plum_malloc(image, sizeof(uint32_t) * image->width * image->height);
+		if (image->data == NULL) {
+			plum_destroy_image(image);
+			dib_free(tmp);
+			return NULL;
+		}
+		memcpy(image->data, dib_get_img(tmp), sizeof(uint32_t) * image->width * image->height);
+	} else if (dib_get_bpp(tmp) == 8) {
+		int nclrs = dib_get_nclrs(tmp);
+		image->max_palette_index = nclrs - 1;
+		image->data = plum_malloc(image, sizeof(uint8_t) * image->width * image->height);
+		image->palette = plum_malloc(image, sizeof(uint32_t) * nclrs);
+		if (image->data == NULL || image->palette == NULL) {
+			plum_destroy_image(image);
+			dib_free(tmp);
+			return NULL;
+		}
+		memcpy(image->data, dib_get_img(tmp), sizeof(uint8_t) * image->width * image->height);
+		memcpy(image->palette, dib_get_pal(tmp), sizeof(uint32_t) * nclrs);
+	}
+
+	dib_free(tmp);
+	return image;
+}
+
+// --------------------------------------------------------------------
+// LIBPLUM - CLDIB WRAPPERS
+// --------------------------------------------------------------------
+
+CLDIB *plum2dib(struct plum_image *fi)
+{
+	if(fi == NULL)
+		return NULL;
+
+	CLDIB *dib;
+
+	if (fi->palette != NULL)
+	{
+		// If the original image has a palette, keep it.
+
+		dib = dib_alloc(fi->width, fi->height, 8, (const BYTE*) fi->data);
+		if (dib == NULL)
+			return NULL;
+
+		memset(dib_get_pal(dib), 0, sizeof(RGBQUAD) * 256);
+
+		int nclrs = ((int)fi->max_palette_index + 1);
+		plum_convert_colors(dib_get_pal(dib), fi->palette, nclrs, CLDIB_PLUM_COLOR_FORMAT, fi->color_format);
+	}
+	else if (fi->color_format != CLDIB_PLUM_COLOR_FORMAT)
+	{
+		// The original image doesn't have a palette, and the format isn't
+		// the one expected by CLDIB. Convert it.
+
+		uint32_t *colors = (uint32_t*) malloc(sizeof(uint32_t) * fi->width * fi->height);
+		if (colors == NULL)
+			return NULL;
+
+		plum_convert_colors(colors, fi->data, fi->width * fi->height, CLDIB_PLUM_COLOR_FORMAT, fi->color_format);
+		dib = dib_alloc(fi->width, fi->height, 32, (const BYTE*) colors);
+
+		free(colors);
+	}
+	else
+	{
+		// If the format of the image matches the one expected by CLDIB there is
+		// nothing to do.
+
+		dib = dib_alloc(fi->width, fi->height, 32, (const BYTE*) fi->data);
+	}
+
+	// flip for top down
+	// dib_vflip(dib);
+
+	return dib;
+}
+
+//! Loads an image
+/*!	\param fpath	Full path of image file
+*	\return	Valid CLDIB, or NULL on failure
+*/
+CLDIB *cldib_load(const char *fpath, void *extra)
+{
+	(void)extra;
+
+	unsigned error;
+	struct plum_image *image = plum_load_image_limited(fpath, PLUM_MODE_FILENAME, CLDIB_PLUM_COLOR_FORMAT | PLUM_PALETTE_LOAD,
+		16384 * 16384, &error);
+
+	if(image == NULL) {
+		lprintf(LOG_ERROR, "Error loading image '%s': %s (%u)\n", fpath, plum_get_error_text(error), error);
+		return NULL;
+	}
+
+	CLDIB *dib = plum2dib(image);
+	plum_destroy_image(image);
+	return dib;
+}
+
+bool cldib_save(const CLDIB *dib, const char *fpath, void *extra)
+{
+	(void)extra;
+
+	// Detect the extension that we need to use to save the file
+	size_t fpath_len = strlen(fpath);
+	const char *extension = fpath + fpath_len - strlen(".XXX");
+
+	unsigned int type;
+
+	if(strcasecmp(extension, ".png") == 0) {
+		type = PLUM_IMAGE_PNG;
+		lprintf(LOG_STATUS, "Saving image as PNG: %s\n", fpath);
+	} else if(strcasecmp(extension, ".bmp") == 0) {
+		type = PLUM_IMAGE_BMP;
+		lprintf(LOG_STATUS, "Saving image as BMP: %s\n", fpath);
+	} else if(strcasecmp(extension, ".gif") == 0) {
+		type = PLUM_IMAGE_GIF;
+		lprintf(LOG_STATUS, "Saving image as GIF: %s\n", fpath);
+	} else {
+		lprintf(LOG_ERROR, "Invalid image format: %s\n", fpath);
+		return false;
+	}
+
+	struct plum_image *image = dib2plum(dib);
+
+	if(image == NULL)
+		return false;
+
+	image->type = type;
+
+	unsigned error;
+	size_t len = plum_store_image(image, (void*) fpath, PLUM_MODE_FILENAME, &error);
+
+	if(len == 0) {
+		lprintf(LOG_ERROR, "Error saving image '%s': %s (%u)\n", fpath, plum_get_error_text(error), error);
+		return false;
+	} else {
+		return true;
+	}
+}
+
+// EOF

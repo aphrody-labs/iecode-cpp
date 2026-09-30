@@ -1,0 +1,8 @@
+# 16-bit depth
+-gB16
+
+# Bitmap image
+-gb
+
+# Disable transparency
+-gT!

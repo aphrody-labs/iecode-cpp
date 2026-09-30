@@ -1,0 +1,422 @@
+// SPDX-License-Identifier: ISC
+//
+// Copyright (c) 2008, Mukunda Johnson (mukunda@maxmod.org)
+
+/****************************************************************************
+ *                ____ ___  ____ __  ______ ___  ____  ____/ /              *
+ *               / __ `__ \/ __ `/ |/ / __ `__ \/ __ \/ __  /               *
+ *              / / / / / / /_/ />  </ / / / / / /_/ / /_/ /                *
+ *             /_/ /_/ /_/\__,_/_/|_/_/ /_/ /_/\____/\__,_/                 *
+ *                                                                          *
+ ****************************************************************************/
+
+// Will unroll upto 1kb more of data (when fixing NDS samples)
+#define MAX_UNROLL_THRESHOLD    1024
+
+#define GBA_MIN_LOOP_SIZE       512
+
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+
+#include "defs.h"
+#include "mas.h"
+#include "errors.h"
+#include "systems.h"
+#include "adpcm.h"
+
+extern int ignore_sflags;
+
+void Sample_PadEnd(Sample *samp, u32 count)
+{
+    // Pad end of sample with loop data (or zero) and shift loops forward
+
+    if (count == 0)
+        return; // nothing to do
+
+    u32 lpoint = samp->loop_start;
+    u32 length = samp->loop_type ? samp->loop_end : samp->sample_length;
+
+    if (samp->format & SAMPF_16BIT)
+    {
+        u16 *newdata16 = (u16*)realloc(samp->data, (length + count) * 2);
+
+        if (samp->loop_type)
+        {
+            for (u32 x = 0; x < count; x++)
+                newdata16[length + x] = newdata16[lpoint + x];
+        }
+        else
+        {
+            for (u32 x = 0; x < count; x++)
+                newdata16[length + x] = 32768;
+        }
+
+        samp->data = (void *)newdata16;
+    }
+    else
+    {
+        u8 *newdata8 = (u8*)realloc(samp->data, length + count);
+
+        if (samp->loop_type)
+        {
+            for (u32 x = 0; x < count; x++)
+                newdata8[length + x] = newdata8[lpoint + x];
+        }
+        else
+        {
+            for (u32 x = 0; x < count; x++)
+                newdata8[length + x] = 128;
+        }
+
+        samp->data = (void *)newdata8;
+    }
+
+    if (samp->loop_type)
+    {
+        samp->loop_start += count;
+        samp->loop_end   += count;
+    }
+    samp->sample_length = length + count;
+}
+
+void Unroll_Sample_Loop(Sample *samp, u32 count)
+{
+    u32 addition = count*(samp->loop_end - samp->loop_start);
+    Sample_PadEnd(samp, addition);
+    samp->loop_start -= addition;
+}
+
+void Unroll_BIDI_Sample(Sample* samp)
+{
+    // sample MUST have loop type 2 (BIDI)
+
+    u32 lpoint = samp->loop_start;
+    u32 length = samp->loop_end;
+    u32 looplen = length - lpoint;
+
+    if (samp->format & SAMPF_16BIT)
+    {
+        u16 *newdata16 = (u16*)realloc(samp->data, (length + looplen) * 2);
+
+        for (u32 x = 0; x < looplen; x++)
+            newdata16[length + x] = newdata16[length-1 - x];
+
+        samp->data = (void *)newdata16;
+    }
+    else
+    {
+        u8 *newdata8 = (u8*)realloc(samp->data, length + looplen);
+
+        for (u32 x = 0; x < looplen; x++)
+            newdata8[length + x] = newdata8[length-1 - x];
+
+        samp->data = (void *)newdata8;
+    }
+
+    samp->loop_type = 1;
+    samp->sample_length = samp->loop_end = length + looplen;
+}
+
+/*
+NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE
+
+The following resample routine was stolen from CHIBITRACKER (http://chibitracker.berlios.de),
+thanks reduz!
+
+NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE
+*/
+
+void Resample(Sample *samp, u32 oldrate, u32 newrate)
+{
+    // output pointers
+    u8 *dst8 = 0;
+    u16 *dst16 = 0;
+    u8 *src8 = (u8 *)samp->data;
+    u16 *src16 = (u16 *)samp->data;
+
+    // oldlength clips to loop-end for loop wraparound in resampler
+    int lpoint = samp->loop_start;
+    int oldlength = (samp->loop_type ? samp->loop_end : samp->sample_length);
+    u32 oldlooplen = samp->loop_end-samp->loop_start;
+    u32 newsize = (u32)(((u64)oldlength*newrate-1)/oldrate) + 1;
+    u32 newlooplen = (u32)((u64)oldlooplen*newrate/oldrate);
+
+    bool bit16 = samp->format & SAMPF_16BIT;
+    double sign_diff;
+
+    // allocate memory
+    if (bit16)
+    {
+        dst16 = (u16*)malloc(newsize * 2);
+        sign_diff = 32768.0;
+    }
+    else
+    {
+        dst8 = (u8*)malloc(newsize);
+        sign_diff = 128.0;
+    }
+
+    double tscale = (double)oldrate / (double)newrate;
+    double posf;
+
+    for (size_t i = 0; i < newsize; i++)
+    {
+        posf = (double)i * tscale;
+        int posi = (int)floor(posf);
+
+        double mu = posf - (double)posi;
+        double s0, s1, s2, s3;
+        double mu2, a0, a1, a2, a3, res;
+
+        // get previous, current, next, and after next samples
+        if (bit16)
+        {
+            s0 = (posi - 1) < 0 ? 0 : ((double)(src16[posi - 1]));
+            s1 =                      ((double)(src16[posi    ]));
+            s2 = (posi + 1) >= oldlength ?
+                        (samp->loop_type ?
+                                      ((double)(src16[lpoint + (posi + 1 - oldlength)])) : 0) :
+                                      ((double)(src16[posi + 1]));
+            s3 = (posi + 1) >= oldlength ?
+                        (samp->loop_type ?
+                                      ((double)(src16[lpoint + (posi + 2 - oldlength)])) : 0) :
+                                      ((double)(src16[posi + 2]));
+        }
+        else
+        {
+            s0 = (posi - 1) < 0 ? 0 : ((double)(src8[posi - 1]));
+            s1 =                      ((double)(src8[posi    ]));
+            s2 = (posi + 1) >= oldlength ?
+                        (samp->loop_type ?
+                                      ((double)(src8[lpoint + (posi + 1 - oldlength)])) : 0) :
+                                      ((double)(src8[posi + 1]));
+            s3 = (posi + 1) >= oldlength ?
+                        (samp->loop_type ?
+                                      ((double)(src8[lpoint + (posi + 2 - oldlength)])) : 0) :
+                                      ((double)(src8[posi + 2]));
+        }
+
+        // sign data
+        s0 -= sign_diff;
+        s1 -= sign_diff;
+        s2 -= sign_diff;
+        s3 -= sign_diff;
+
+        mu2 = mu * mu;
+        a0 = s3 - s2 - s0 + s1;
+        a1 = s0 - s1 - a0;
+        a2 = s2 - s0;
+        a3 = s1;
+
+        res = (a0 * mu * mu2) + (a1 * mu2) + (a2 * mu) + a3;
+        int resi = ((int)floor(res + 0.5));
+
+        if (bit16)
+        {
+            if (resi < -32768)
+                resi = -32768;
+            if (resi > 32767)
+                resi = 32767;
+            dst16[i] = resi + 32768;
+        }
+        else
+        {
+            if (resi < -128)
+                resi = -128;
+            if (resi > 127)
+                resi = 127;
+            dst8[i] = resi + 128;
+        }
+    }
+
+    free(samp->data);
+    if (bit16)
+        samp->data = (void *)dst16;
+    else
+        samp->data = (void *)dst8;
+
+    samp->sample_length = newsize;
+    samp->loop_end = newsize;
+    samp->loop_start = newsize - newlooplen;
+    samp->frequency = (int)((double)samp->frequency / tscale);
+}
+
+void Sample_8bit(Sample *samp)
+{
+    if (samp->format & SAMPF_16BIT)
+    {
+        u8 *newdata = (u8 *)malloc(samp->sample_length);
+
+        for (u32 t = 0; t < samp->sample_length; t++)
+            newdata[t] = ((u16 * )samp->data)[t] / 256;
+
+        free(samp->data);
+        samp->data = newdata;
+//        samp->bit16 = false;
+        samp->format &= ~SAMPF_16BIT;
+    }
+}
+
+void Sample_Sign(Sample *samp)
+{
+    // sample must be unsigned
+    if (samp->format & SAMPF_16BIT)
+    {
+        for (u32 x = 0; x < samp->sample_length; x++)
+        {
+            int a = (((int)((u16 *)samp->data)[x]) - 32768);
+            if (a < -32767) // clamp LOW to -32767 (leave space for interpolation error)
+                a = -32767;
+            //if (a > 32765) // clamp HIGH to 32766
+            //    a = 32765;
+            ((u16 *)samp->data)[x] = (u16)a;
+        }
+    }
+    else
+    {
+        for (u32 x = 0; x < samp->sample_length; x++)
+        {
+            int a = (((int)((u8 *)samp->data)[x]) - 128);
+            if (a == -128)
+                a = -127;
+            ((u8 *)samp->data)[x] = (u8)a;
+        }
+    }
+
+    samp->format |= SAMPF_SIGNED;
+}
+
+void FixSample_GBA(Sample *samp)
+{
+    // convert to 8-bit if neccesary
+    Sample_8bit(samp);
+
+    // delete data after loop_end if loop exists
+    if (samp->loop_type != 0)
+        samp->sample_length = samp->loop_end;
+
+    // unroll BIDI loop
+    if (samp->loop_type == 2)
+        Unroll_BIDI_Sample(samp);
+
+    if (samp->loop_type)
+    {
+        int loop_length = samp->loop_end - samp->loop_start;
+
+        // if loop exists and is empty, there is no actual loop
+        if (loop_length <= 0)
+        {
+            samp->loop_type = 0;
+        }
+        else if (loop_length < GBA_MIN_LOOP_SIZE)
+        {
+            Unroll_Sample_Loop(samp, (GBA_MIN_LOOP_SIZE / (samp->loop_end-samp->loop_start)) + 1);
+        }
+    }
+}
+
+void FixSample_NDS(Sample *samp)
+{
+    if (samp->sample_length == 0)
+    {
+        // sample has no data
+        samp->loop_end=samp->loop_start=0;
+        return;
+    }
+
+    // delete data after loop_end if loop exists
+    if (samp->loop_type != 0)
+        samp->sample_length = samp->loop_end;
+
+    // unroll BIDI loop
+    if (samp->loop_type == 2)
+        Unroll_BIDI_Sample(samp);
+
+    // %o option.
+    //
+    // Used to support the `9xx` command when using the DS hardware channels for
+    // playback. In MOD/XM (maybe others) you can use a sample offset command to
+    // start playing beyond the loop start, and then when the sample hits the
+    // loop end it'll still correctly loop back to the start.
+    if (samp->loop_type)
+    {
+        if (!ignore_sflags)
+        {
+            if (strstr(samp->name, "%o") != NULL)
+            {
+                Unroll_Sample_Loop(samp, 1);
+                samp->loop_start += (samp->loop_end-samp->loop_start) / 2;
+            }
+        }
+    }
+
+    // %c option
+    //
+    // Compress the sample using IMA-ADPCM. This only works on NDS in hardware
+    // mixer mode.
+    if (!ignore_sflags)
+    {
+        if (strstr(samp->name, "%c") != NULL)
+        {
+            samp->format |= SAMPF_COMP;
+        }
+    }
+
+    u32 alignmask = (samp->format & SAMPF_COMP) ? 7 : (samp->format & SAMPF_16BIT) ? 1 : 3;
+
+    // Resize loop
+    if (samp->loop_type)
+    {
+        u32 count = 0;
+        u32 looplen = samp->loop_end-samp->loop_start;
+        u32 unrolledlen = looplen;
+        while (unrolledlen & alignmask)
+        {
+            count++;
+            unrolledlen += looplen;
+        }
+
+        u32 addition = unrolledlen - looplen;
+        if (addition > MAX_UNROLL_THRESHOLD)
+            Resample(samp, looplen, looplen + ((-looplen) & alignmask));
+        else if (count > 0)
+            Unroll_Sample_Loop(samp, count);
+    }
+
+    // Align loop_start (and thus loop_end), or pad sample_length if loop is disabled
+    if (samp->loop_type)
+    {
+        Sample_PadEnd(samp, (-samp->loop_start) & alignmask);
+    }
+    else
+    {
+        Sample_PadEnd(samp, (-samp->sample_length) & alignmask);
+    }
+
+    Sample_Sign(samp); // DS hardware takes signed samples
+
+    if (samp->format & SAMPF_COMP)
+    {
+        // compress with IMA-ADPCM hunger owned
+        adpcm_compress_sample(samp);
+    }
+    else
+    {
+
+    }
+}
+
+void FixSample(Sample *samp)
+{
+    // Clamp loop_start and loop_end (f.e. FR_TOWER.MOD)
+    if (samp->loop_start > samp->sample_length)
+        samp->loop_start = samp->sample_length;
+    if (samp->loop_end > samp->sample_length)
+        samp->loop_end = samp->sample_length;
+
+    if (target_system == SYSTEM_GBA)
+        FixSample_GBA(samp);
+    else if (target_system == SYSTEM_NDS)
+        FixSample_NDS(samp);
+}
