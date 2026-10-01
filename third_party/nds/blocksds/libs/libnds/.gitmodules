@@ -1,3 +1,0 @@
-[submodule "fatfs"]
-	path = fatfs
-	url = ../wf-fatfs

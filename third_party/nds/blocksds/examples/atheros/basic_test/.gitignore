@@ -1,5 +1,0 @@
-*.nds
-*.sav
-build
-compile_commands.json
-arm7/data/xtensa.bin

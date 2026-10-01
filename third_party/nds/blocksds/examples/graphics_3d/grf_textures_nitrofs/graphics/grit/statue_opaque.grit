@@ -1,2 +1,0 @@
-# 8 bit texture bitmap, don't set a transparent color, LZ77 compression
--gx -gb -gB8 -gT! -gzl

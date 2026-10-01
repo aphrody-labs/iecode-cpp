@@ -37,8 +37,7 @@ build output under `/opt/blocksds/core` by default. Keep generated SDK output ou
 - Snapshot: `3ds/libctru/`
 - The upstream license terms are preserved in its README and source headers.
 
-The graphics libraries citro3d and citro2d are pinned separately in
-[`3ds/CONSOLE-SDKS.md`](3ds/CONSOLE-SDKS.md). Install devkitPro packages for builds.
+The graphics libraries citro3d and citro2d are upstream devkitPro libraries. Install devkitPro packages for builds.
 
 ## Shared Lua 5.2.4 C sources
 
