@@ -140,26 +140,20 @@ inline constexpr void write_u64_be(uint8_t* p, uint64_t v) noexcept {
 
 // ── Helpers de lecture float ────────────────────────────────────────
 
-[[nodiscard]] inline float read_f32_le(const uint8_t* p) noexcept {
-    uint32_t bits = read_u32_le(p);
-    float result;
-    std::memcpy(&result, &bits, sizeof(float));
-    return result;
+[[nodiscard]] inline constexpr float read_f32_le(const uint8_t* p) noexcept {
+    return std::bit_cast<float>(read_u32_le(p));
 }
 
-[[nodiscard]] inline float read_f32_le(ByteSpan data, size_t offset) noexcept {
+[[nodiscard]] inline constexpr float read_f32_le(ByteSpan data, size_t offset) noexcept {
     if (offset + 4 > data.size()) return 0.0f;
     return read_f32_le(data.data() + offset);
 }
 
-[[nodiscard]] inline float read_f32_be(const uint8_t* p) noexcept {
-    uint32_t bits = read_u32_be(p);
-    float result;
-    std::memcpy(&result, &bits, sizeof(float));
-    return result;
+[[nodiscard]] inline constexpr float read_f32_be(const uint8_t* p) noexcept {
+    return std::bit_cast<float>(read_u32_be(p));
 }
 
-[[nodiscard]] inline float read_f32_be(ByteSpan data, size_t offset) noexcept {
+[[nodiscard]] inline constexpr float read_f32_be(ByteSpan data, size_t offset) noexcept {
     if (offset + 4 > data.size()) return 0.0f;
     return read_f32_be(data.data() + offset);
 }
