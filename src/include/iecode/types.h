@@ -27,15 +27,12 @@ inline constexpr std::string_view APP_VERSION = "5.00.24.00";
 // ── Helpers de lecture little-endian ─────────────────────────────────
 
 [[nodiscard]] inline constexpr uint16_t read_u16_le(const uint8_t* p) noexcept {
-    return static_cast<uint16_t>(p[0]) |
-           (static_cast<uint16_t>(p[1]) << 8);
+    return static_cast<uint16_t>(p[0]) | (static_cast<uint16_t>(p[1]) << 8);
 }
 
 [[nodiscard]] inline constexpr uint32_t read_u32_le(const uint8_t* p) noexcept {
-    return static_cast<uint32_t>(p[0]) |
-           (static_cast<uint32_t>(p[1]) << 8) |
-           (static_cast<uint32_t>(p[2]) << 16) |
-           (static_cast<uint32_t>(p[3]) << 24);
+    return static_cast<uint32_t>(p[0]) | (static_cast<uint32_t>(p[1]) << 8) |
+           (static_cast<uint32_t>(p[2]) << 16) | (static_cast<uint32_t>(p[3]) << 24);
 }
 
 [[nodiscard]] inline constexpr uint64_t read_u64_le(const uint8_t* p) noexcept {
@@ -54,20 +51,17 @@ inline constexpr std::string_view APP_VERSION = "5.00.24.00";
 // ── Helpers de lecture big-endian ────────────────────────────────────
 
 [[nodiscard]] inline constexpr uint16_t read_u16_be(const uint8_t* p) noexcept {
-    return (static_cast<uint16_t>(p[0]) << 8) |
-            static_cast<uint16_t>(p[1]);
+    return (static_cast<uint16_t>(p[0]) << 8) | static_cast<uint16_t>(p[1]);
 }
 
 [[nodiscard]] inline constexpr uint32_t read_u32_be(const uint8_t* p) noexcept {
-    return (static_cast<uint32_t>(p[0]) << 24) |
-           (static_cast<uint32_t>(p[1]) << 16) |
-           (static_cast<uint32_t>(p[2]) << 8) |
-            static_cast<uint32_t>(p[3]);
+    return (static_cast<uint32_t>(p[0]) << 24) | (static_cast<uint32_t>(p[1]) << 16) |
+           (static_cast<uint32_t>(p[2]) << 8) | static_cast<uint32_t>(p[3]);
 }
 
 [[nodiscard]] inline constexpr uint64_t read_u64_be(const uint8_t* p) noexcept {
     return (static_cast<uint64_t>(read_u32_be(p)) << 32) |
-            static_cast<uint64_t>(read_u32_be(p + 4));
+           static_cast<uint64_t>(read_u32_be(p + 4));
 }
 
 [[nodiscard]] inline constexpr int16_t read_i16_be(const uint8_t* p) noexcept {
@@ -119,22 +113,26 @@ inline constexpr void write_u64_be(uint8_t* p, uint64_t v) noexcept {
 // ── Lecture avec span (safe) ────────────────────────────────────────
 
 [[nodiscard]] inline constexpr uint16_t read_u16_le(ByteSpan data, size_t offset) noexcept {
-    if (offset + 2 > data.size()) return 0;
+    if (offset + 2 > data.size())
+        return 0;
     return read_u16_le(data.data() + offset);
 }
 
 [[nodiscard]] inline constexpr uint32_t read_u32_le(ByteSpan data, size_t offset) noexcept {
-    if (offset + 4 > data.size()) return 0;
+    if (offset + 4 > data.size())
+        return 0;
     return read_u32_le(data.data() + offset);
 }
 
 [[nodiscard]] inline constexpr uint16_t read_u16_be(ByteSpan data, size_t offset) noexcept {
-    if (offset + 2 > data.size()) return 0;
+    if (offset + 2 > data.size())
+        return 0;
     return read_u16_be(data.data() + offset);
 }
 
 [[nodiscard]] inline constexpr uint32_t read_u32_be(ByteSpan data, size_t offset) noexcept {
-    if (offset + 4 > data.size()) return 0;
+    if (offset + 4 > data.size())
+        return 0;
     return read_u32_be(data.data() + offset);
 }
 
@@ -145,7 +143,8 @@ inline constexpr void write_u64_be(uint8_t* p, uint64_t v) noexcept {
 }
 
 [[nodiscard]] inline constexpr float read_f32_le(ByteSpan data, size_t offset) noexcept {
-    if (offset + 4 > data.size()) return 0.0f;
+    if (offset + 4 > data.size())
+        return 0.0f;
     return read_f32_le(data.data() + offset);
 }
 
@@ -154,24 +153,25 @@ inline constexpr void write_u64_be(uint8_t* p, uint64_t v) noexcept {
 }
 
 [[nodiscard]] inline constexpr float read_f32_be(ByteSpan data, size_t offset) noexcept {
-    if (offset + 4 > data.size()) return 0.0f;
+    if (offset + 4 > data.size())
+        return 0.0f;
     return read_f32_be(data.data() + offset);
 }
 
 // ── Magics connus ───────────────────────────────────────────────────
-inline constexpr uint32_t MAGIC_G4TX = 0x47345458;      // "G4TX" big-endian
-inline constexpr uint32_t MAGIC_G4MG = 0x47344D47;      // "G4MG"
-inline constexpr uint32_t MAGIC_G4MD = 0x47344D44;      // "G4MD"
-inline constexpr uint32_t MAGIC_G4SK = 0x47345340;      // "G4SK@" (premier u32)
-inline constexpr uint32_t MAGIC_G4MT = 0x544D3447;      // "G4MT" little-endian read
-inline constexpr uint32_t MAGIC_G4PK = 0x47345040;      // "G4PK@"
-inline constexpr uint32_t MAGIC_CPK  = 0x43504B20;      // "CPK " big-endian
-inline constexpr uint32_t MAGIC_UTF  = 0x40555446;      // "@UTF"
-inline constexpr uint32_t MAGIC_G4CM = 0x47344D43;      // "G4CM" big-endian
-inline constexpr uint32_t MAGIC_RDBN = 0x5244424E;      // "RDBN"
-inline constexpr uint32_t MAGIC_AFS2 = 0x32534641;      // "AFS2" little-endian
-inline constexpr uint32_t MAGIC_G4NV = 0x564E3447;      // "G4NV" little-endian
-inline constexpr uint32_t MAGIC_COL0 = 0x004C4F43;      // "COL\0" little-endian
-inline constexpr uint32_t MAGIC_COLS = 0x534C4F43;      // "COLS" little-endian
+inline constexpr uint32_t MAGIC_G4TX = 0x47345458;  // "G4TX" big-endian
+inline constexpr uint32_t MAGIC_G4MG = 0x47344D47;  // "G4MG"
+inline constexpr uint32_t MAGIC_G4MD = 0x47344D44;  // "G4MD"
+inline constexpr uint32_t MAGIC_G4SK = 0x47345340;  // "G4SK@" (premier u32)
+inline constexpr uint32_t MAGIC_G4MT = 0x544D3447;  // "G4MT" little-endian read
+inline constexpr uint32_t MAGIC_G4PK = 0x47345040;  // "G4PK@"
+inline constexpr uint32_t MAGIC_CPK = 0x43504B20;   // "CPK " big-endian
+inline constexpr uint32_t MAGIC_UTF = 0x40555446;   // "@UTF"
+inline constexpr uint32_t MAGIC_G4CM = 0x47344D43;  // "G4CM" big-endian
+inline constexpr uint32_t MAGIC_RDBN = 0x5244424E;  // "RDBN"
+inline constexpr uint32_t MAGIC_AFS2 = 0x32534641;  // "AFS2" little-endian
+inline constexpr uint32_t MAGIC_G4NV = 0x564E3447;  // "G4NV" little-endian
+inline constexpr uint32_t MAGIC_COL0 = 0x004C4F43;  // "COL\0" little-endian
+inline constexpr uint32_t MAGIC_COLS = 0x534C4F43;  // "COLS" little-endian
 
-} // namespace iecode
+}  // namespace iecode

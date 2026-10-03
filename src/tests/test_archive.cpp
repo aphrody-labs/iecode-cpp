@@ -4,21 +4,20 @@
 /// Ces tests construisent une mini archive tar.zst en memoire/temp,
 /// puis valident le streaming, le roundtrip d'index, le grep, etc.
 
-#include <gtest/gtest.h>
-
 #include "iecode/archive/tar_zstd.h"
 #include "iecode/io/zstd_stream.h"
 
-#include <zstd.h>
-
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <gtest/gtest.h>
 #include <random>
 #include <string>
 #include <vector>
+#include <zstd.h>
 
 namespace fs = std::filesystem;
 using namespace iecode::archive;
@@ -32,9 +31,7 @@ namespace {
 constexpr std::size_t k_block = 512;
 
 /// Ecrit un header tar ustar pour un fichier regulier.
-void write_tar_header(std::vector<std::uint8_t>& out,
-                      const std::string& name,
-                      std::uint64_t size) {
+void write_tar_header(std::vector<std::uint8_t>& out, const std::string& name, std::uint64_t size) {
     std::array<std::uint8_t, k_block> hdr{};
 
     // Nom (max 100, sinon il faudrait LongName)
@@ -52,12 +49,16 @@ void write_tar_header(std::vector<std::uint8_t>& out,
     std::snprintf(buf, sizeof(buf), "%011llo", 1700000000ULL);
     std::memcpy(hdr.data() + 136, buf, 11);
 
-    std::memset(hdr.data() + 148, ' ', 8);   // checksum placeholder
-    hdr[156] = '0';                           // typeflag = regular file
-    std::memcpy(hdr.data() + 257, "ustar\0" "00", 8);
+    std::memset(hdr.data() + 148, ' ', 8);  // checksum placeholder
+    hdr[156] = '0';                         // typeflag = regular file
+    std::memcpy(hdr.data() + 257,
+                "ustar\0"
+                "00",
+                8);
 
     std::uint32_t chk = 0;
-    for (auto b : hdr) chk += b;
+    for (auto b : hdr)
+        chk += b;
     std::snprintf(buf, sizeof(buf), "%06o", chk);
     std::memcpy(hdr.data() + 148, buf, 6);
     hdr[148 + 6] = 0;
@@ -67,8 +68,7 @@ void write_tar_header(std::vector<std::uint8_t>& out,
 }
 
 /// Ecrit un fichier complet (header + payload + padding) dans le buffer tar.
-void tar_add_file(std::vector<std::uint8_t>& out,
-                  const std::string& name,
+void tar_add_file(std::vector<std::uint8_t>& out, const std::string& name,
                   std::span<const std::uint8_t> data) {
     write_tar_header(out, name, data.size());
     out.insert(out.end(), data.begin(), data.end());
@@ -85,14 +85,14 @@ void tar_finalize(std::vector<std::uint8_t>& out) {
 std::vector<std::uint8_t> zstd_compress(std::span<const std::uint8_t> input) {
     const std::size_t bound = ZSTD_compressBound(input.size());
     std::vector<std::uint8_t> out(bound);
-    const auto n = ZSTD_compress(out.data(), out.size(),
-                                 input.data(), input.size(), 3);
+    const auto n = ZSTD_compress(out.data(), out.size(), input.data(), input.size(), 3);
     out.resize(n);
     return out;
 }
 
 /// Cree un fichier .tar.zst dans un dossier temporaire et retourne le chemin.
-fs::path make_test_archive(const std::vector<std::pair<std::string, std::vector<std::uint8_t>>>& files) {
+fs::path make_test_archive(
+    const std::vector<std::pair<std::string, std::vector<std::uint8_t>>>& files) {
     std::vector<std::uint8_t> tar;
     for (const auto& [name, data] : files) {
         tar_add_file(tar, name, data);
@@ -102,9 +102,12 @@ fs::path make_test_archive(const std::vector<std::pair<std::string, std::vector<
     auto compressed = zstd_compress(tar);
 
     static std::atomic<int> counter{0};
-    const auto path = fs::temp_directory_path()
-        / fs::path(std::string("iecode_archive_test_") +
-                   std::to_string(counter.fetch_add(1)) + ".tar.zst");
+    const auto path =
+        fs::temp_directory_path() /
+        fs::path(std::string("iecode_archive_test_") +
+                 std::string(::testing::UnitTest::GetInstance()->current_test_info()->name()) +
+                 "_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) +
+                 "_" + std::to_string(counter.fetch_add(1)) + ".tar.zst");
 
     std::ofstream f(path, std::ios::binary | std::ios::trunc);
     f.write(reinterpret_cast<const char*>(compressed.data()),
@@ -131,7 +134,7 @@ std::vector<std::uint8_t> bytes(std::string_view s) {
             reinterpret_cast<const std::uint8_t*>(s.data()) + s.size()};
 }
 
-} // namespace
+}  // namespace
 
 // ═══════════════════════════════════════════════════════════════════
 // validate_tar_checksum
@@ -163,8 +166,8 @@ TEST(TarChecksum, CorruptedHeaderFails) {
 
 TEST(TarZstdReader, ListSimpleArchive) {
     TempArchive arch(make_test_archive({
-        {"hello.txt",     bytes("hello world")},
-        {"data/foo.bin",  bytes("\x01\x02\x03\x04")},
+        {"hello.txt", bytes("hello world")},
+        {"data/foo.bin", bytes("\x01\x02\x03\x04")},
         {"data/bar.json", bytes("{\"k\":1}")},
     }));
 
@@ -211,9 +214,9 @@ TEST(TarZstdReader, EarlyExitFromCallback) {
 TEST(TarZstdReader, ReadOneRoundtrip) {
     const std::string payload = "The quick brown fox jumps over the lazy dog";
     TempArchive arch(make_test_archive({
-        {"first.txt",  bytes("first")},
+        {"first.txt", bytes("first")},
         {"target.txt", bytes(payload)},
-        {"third.txt",  bytes("third")},
+        {"third.txt", bytes("third")},
     }));
 
     TarZstdReader reader(arch.path);
@@ -259,7 +262,8 @@ TEST(TarZstdReader, ReadOneToStreamingChunks) {
     // Payload de 5 MB pour declencher plusieurs chunks de 1 MB
     std::vector<std::uint8_t> payload(5 * 1024 * 1024);
     std::mt19937 rng(42);
-    for (auto& b : payload) b = static_cast<std::uint8_t>(rng() & 0xFF);
+    for (auto& b : payload)
+        b = static_cast<std::uint8_t>(rng() & 0xFF);
 
     TempArchive arch(make_test_archive({
         {"big.bin", payload},
@@ -268,13 +272,11 @@ TEST(TarZstdReader, ReadOneToStreamingChunks) {
     TarZstdReader reader(arch.path);
     std::vector<std::uint8_t> reconstructed;
     int chunk_count = 0;
-    const bool ok = reader.read_one_to(
-        "big.bin",
-        [&](std::span<const std::uint8_t> chunk) {
-            reconstructed.insert(reconstructed.end(), chunk.begin(), chunk.end());
-            ++chunk_count;
-            return true;
-        });
+    const bool ok = reader.read_one_to("big.bin", [&](std::span<const std::uint8_t> chunk) {
+        reconstructed.insert(reconstructed.end(), chunk.begin(), chunk.end());
+        ++chunk_count;
+        return true;
+    });
 
     EXPECT_TRUE(ok);
     EXPECT_GE(chunk_count, 2);  // doit etre chunk-e
@@ -350,7 +352,7 @@ TEST(TarZstdReader, IndexInvalidatedOnSizeChange) {
 TEST(TarZstdReader, ExtractAllToTemp) {
     TempArchive arch(make_test_archive({
         {"a/b/c.txt", bytes("nested")},
-        {"top.txt",   bytes("top-level")},
+        {"top.txt", bytes("top-level")},
     }));
 
     const auto out_dir = fs::temp_directory_path() / "iecode_archive_test_extract";
@@ -368,8 +370,7 @@ TEST(TarZstdReader, ExtractAllToTemp) {
 
     {
         std::ifstream f(out_dir / "a/b/c.txt", std::ios::binary);
-        std::string content((std::istreambuf_iterator<char>(f)),
-                             std::istreambuf_iterator<char>());
+        std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
         EXPECT_EQ(content, "nested");
     }
 
@@ -378,8 +379,8 @@ TEST(TarZstdReader, ExtractAllToTemp) {
 
 TEST(TarZstdReader, ExtractWithFilter) {
     TempArchive arch(make_test_archive({
-        {"keep.txt",  bytes("yes")},
-        {"skip.bin",  bytes("no")},
+        {"keep.txt", bytes("yes")},
+        {"skip.bin", bytes("no")},
         {"keep2.txt", bytes("yes2")},
     }));
 
@@ -390,8 +391,7 @@ TEST(TarZstdReader, ExtractWithFilter) {
     {
         TarZstdReader reader(arch.path);
         const auto written = reader.extract(out_dir, [](const TarEntry& e) {
-            return e.name.size() > 4 &&
-                   e.name.compare(e.name.size() - 4, 4, ".txt") == 0;
+            return e.name.size() > 4 && e.name.compare(e.name.size() - 4, 4, ".txt") == 0;
         });
         EXPECT_EQ(written, 2);
     }

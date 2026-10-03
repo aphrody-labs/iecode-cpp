@@ -100,14 +100,10 @@ target_link_libraries(iecode_core PUBLIC glm::glm)
 target_compile_definitions(iecode_core PUBLIC IECODE_HAS_GLM=1)
 
 target_link_libraries(iecode_core PUBLIC
-    assimp::assimp
     bgfx::bgfx
-    sol2::sol2
 )
 target_compile_definitions(iecode_core PUBLIC
-    IECODE_HAS_ASSIMP=1
     IECODE_HAS_BGFX=1
-    IECODE_HAS_SOL2=1
 )
 
 # libpqxx (optional — PostgreSQL / Supabase push)

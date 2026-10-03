@@ -6,12 +6,11 @@
  * sous-commandes enregistrees dans cli/commands/.
  */
 
-#include "commands/commands.h"
-
 #include <CLI/CLI.hpp>
-#include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
 
+#include "commands/commands.h"
 #include <string>
 
 #ifdef _WIN32
@@ -38,6 +37,7 @@ int main(int argc, char* argv[]) {
 
     // ── CLI11 app ───────────────────────────────────────────────
     CLI::App app{"iecode — toolkit RE & modding pour Inazuma Eleven: Victory Road"};
+    app.set_version_flag("--version", IECODE_VERSION);
     app.require_subcommand(1);
 
     // Options globales
@@ -46,8 +46,7 @@ int main(int argc, char* argv[]) {
 
     app.add_option("-g,--game", game_path,
                    "Chemin vers le dossier du jeu (INAZUMA ELEVEN Victory Road)");
-    app.add_flag("-v,--verbose", verbose,
-                 "Active le mode verbeux (debug logging)");
+    app.add_flag("-v,--verbose", verbose, "Active le mode verbeux (debug logging)");
 
     // Callback pour activer le debug si --verbose
     app.parse_complete_callback([&]() {

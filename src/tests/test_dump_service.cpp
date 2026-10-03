@@ -8,12 +8,13 @@
 
 #include "iecode/services/dump_service.h"
 
-#include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 
 #include <atomic>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <gtest/gtest.h>
 #include <string>
 #include <vector>
 
@@ -30,8 +31,11 @@ protected:
     fs::path output_dir_;
 
     void SetUp() override {
-        temp_dir_ = fs::temp_directory_path() / "iecode_dump_test";
-        fs::remove_all(temp_dir_);
+        const auto* test = ::testing::UnitTest::GetInstance()->current_test_info();
+        const auto nonce = std::chrono::steady_clock::now().time_since_epoch().count();
+        temp_dir_ = fs::temp_directory_path() /
+                    ("iecode_dump_test_" + std::string(test->name()) + "_" + std::to_string(nonce));
+        ASSERT_TRUE(fs::create_directory(temp_dir_));
         game_dir_ = temp_dir_ / "game";
         output_dir_ = temp_dir_ / "output";
         fs::create_directories(game_dir_ / "data" / "packs");
@@ -61,7 +65,8 @@ protected:
     /// Lit le manifest JSON depuis le dossier de sortie.
     [[nodiscard]] json read_manifest() const {
         std::ifstream f(output_dir_ / ".iecode-manifest.json");
-        if (!f) return {};
+        if (!f)
+            return {};
         return json::parse(f);
     }
 };
@@ -145,7 +150,7 @@ TEST_F(DumpServiceTest, CancellationFlag) {
     opts.output_path = output_dir_;
     opts.include_loose_files = false;
 
-    std::atomic<bool> cancel{true}; // Pre-cancelled
+    std::atomic<bool> cancel{true};  // Pre-cancelled
     auto result = svc.dump(opts, cancel);
 
     EXPECT_TRUE(result.was_cancelled);
@@ -214,9 +219,7 @@ TEST_F(DumpServiceTest, ProgressCallbackInvoked) {
     opts.include_loose_files = false;
 
     int callback_count = 0;
-    opts.on_progress = [&callback_count](const DumpProgress&) {
-        ++callback_count;
-    };
+    opts.on_progress = [&callback_count](const DumpProgress&) { ++callback_count; };
 
     (void)svc.dump(opts);
     // Au minimum : LOADING + PLANNING + COMPLETED

@@ -6,10 +6,10 @@
 
 #include "iecode/services/eac_service.h"
 
-#include <gtest/gtest.h>
-
+#include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <gtest/gtest.h>
 #include <string>
 
 namespace fs = std::filesystem;
@@ -23,9 +23,11 @@ protected:
 
     void SetUp() override {
         // Creer un repertoire temporaire unique pour chaque test
-        temp_dir_ = fs::temp_directory_path() / "iecode_eac_test";
-        fs::remove_all(temp_dir_);
-        fs::create_directories(temp_dir_);
+        const auto nonce = std::chrono::steady_clock::now().time_since_epoch().count();
+        const auto* test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+        temp_dir_ = fs::temp_directory_path() / (std::string("iecode_eac_test_") +
+                                                 test_info->name() + "_" + std::to_string(nonce));
+        ASSERT_TRUE(fs::create_directory(temp_dir_));
     }
 
     void TearDown() override {
@@ -57,7 +59,9 @@ protected:
 
 TEST_F(EacServiceTest, StatusOnFreshInstall) {
     // Simuler une installation fraiche avec EAC actif
-    write_ini("ApplicationPath=EACLauncher.exe\r\nWorkingDirectory=\r\nWaitForExit=0\r\nNoOperation=0\r\n");
+    write_ini(
+        "ApplicationPath=EACLauncher.exe\r\nWorkingDirectory=\r\nWaitForExit=0\r\nNoOperation="
+        "0\r\n");
     create_dummy_file(temp_dir_ / "EACLauncher.exe", 1024);
 
     EacService svc(temp_dir_);
@@ -71,7 +75,9 @@ TEST_F(EacServiceTest, StatusOnFreshInstall) {
 
 TEST_F(EacServiceTest, DisableEac) {
     // Installation fraiche
-    write_ini("ApplicationPath=EACLauncher.exe\r\nWorkingDirectory=\r\nWaitForExit=0\r\nNoOperation=0\r\n");
+    write_ini(
+        "ApplicationPath=EACLauncher.exe\r\nWorkingDirectory=\r\nWaitForExit=0\r\nNoOperation="
+        "0\r\n");
     create_dummy_file(temp_dir_ / "EACLauncher.exe", 1024);
 
     EacService svc(temp_dir_);
@@ -106,7 +112,9 @@ TEST_F(EacServiceTest, DisableEacIdempotent) {
 
 TEST_F(EacServiceTest, RestoreEac) {
     // D'abord desactiver
-    write_ini("ApplicationPath=EACLauncher.exe\r\nWorkingDirectory=\r\nWaitForExit=0\r\nNoOperation=0\r\n");
+    write_ini(
+        "ApplicationPath=EACLauncher.exe\r\nWorkingDirectory=\r\nWaitForExit=0\r\nNoOperation="
+        "0\r\n");
     create_dummy_file(temp_dir_ / "EACLauncher.exe", 1024);
 
     EacService svc(temp_dir_);
@@ -147,7 +155,9 @@ TEST_F(EacServiceTest, RestoreWithoutBackup) {
 
 TEST_F(EacServiceTest, DisableWithLauncherAlreadyBackedUp) {
     // Launcher deja backup (ancien disable partiel)
-    write_ini("ApplicationPath=EACLauncher.exe\r\nWorkingDirectory=\r\nWaitForExit=0\r\nNoOperation=0\r\n");
+    write_ini(
+        "ApplicationPath=EACLauncher.exe\r\nWorkingDirectory=\r\nWaitForExit=0\r\nNoOperation="
+        "0\r\n");
     create_dummy_file(temp_dir_ / "EACLauncher.exe", 1024);
     create_dummy_file(temp_dir_ / "EACLauncher.exe.backup", 2048);
 
@@ -167,7 +177,9 @@ TEST_F(EacServiceTest, InvalidGameDir) {
 
 TEST_F(EacServiceTest, StatusDetectsBackupOnly) {
     // INI normal mais backup du launcher existe (etat incoherent)
-    write_ini("ApplicationPath=EACLauncher.exe\r\nWorkingDirectory=\r\nWaitForExit=0\r\nNoOperation=0\r\n");
+    write_ini(
+        "ApplicationPath=EACLauncher.exe\r\nWorkingDirectory=\r\nWaitForExit=0\r\nNoOperation="
+        "0\r\n");
     create_dummy_file(temp_dir_ / "EACLauncher.exe.backup", 1024);
 
     EacService svc(temp_dir_);
@@ -175,12 +187,14 @@ TEST_F(EacServiceTest, StatusDetectsBackupOnly) {
     EXPECT_TRUE(svc.is_eac_disabled());
 
     const auto status = svc.get_status();
-    EXPECT_FALSE(status.ini_modified);      // INI pas modifie
-    EXPECT_TRUE(status.launcher_backed_up); // Mais backup existe
+    EXPECT_FALSE(status.ini_modified);       // INI pas modifie
+    EXPECT_TRUE(status.launcher_backed_up);  // Mais backup existe
 }
 
 TEST_F(EacServiceTest, IniPreservesKeyOrder) {
-    write_ini("ApplicationPath=EACLauncher.exe\r\nWorkingDirectory=\r\nWaitForExit=0\r\nNoOperation=0\r\n");
+    write_ini(
+        "ApplicationPath=EACLauncher.exe\r\nWorkingDirectory=\r\nWaitForExit=0\r\nNoOperation="
+        "0\r\n");
     create_dummy_file(temp_dir_ / "EACLauncher.exe", 1024);
 
     EacService svc(temp_dir_);

@@ -4,15 +4,15 @@
 ///   - Compatibilite de version (mod_compatibility)
 ///   - Packaging de mods (mod_packager)
 
-#include <gtest/gtest.h>
-#include <algorithm>
-
-#include "iecode/modding/mod_dependency.h"
 #include "iecode/modding/mod_compatibility.h"
+#include "iecode/modding/mod_dependency.h"
 #include "iecode/modding/mod_packager.h"
 
+#include <algorithm>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <gtest/gtest.h>
 
 namespace fs = std::filesystem;
 using namespace iecode::modding;
@@ -144,10 +144,9 @@ TEST(ModDependency, SimpleDependency) {
     EXPECT_TRUE(result.missing.empty());
 
     // base_mod doit apparaitre avant addon_mod dans l'ordre
-    auto it_base = std::find(result.install_order.begin(),
-                             result.install_order.end(), "base_mod");
-    auto it_addon = std::find(result.install_order.begin(),
-                              result.install_order.end(), "addon_mod");
+    auto it_base = std::find(result.install_order.begin(), result.install_order.end(), "base_mod");
+    auto it_addon =
+        std::find(result.install_order.begin(), result.install_order.end(), "addon_mod");
     ASSERT_NE(it_base, result.install_order.end());
     ASSERT_NE(it_addon, result.install_order.end());
     EXPECT_LT(it_base, it_addon);
@@ -194,8 +193,7 @@ TEST(ModDependency, VersionMismatch) {
     ModInfo addon;
     addon.name = "addon_mod";
     addon.enabled = true;
-    addon.metadata.dependencies.push_back(
-        ModDependency{"base_mod", "1.0.0", "2.0.0", false});
+    addon.metadata.dependencies.push_back(ModDependency{"base_mod", "1.0.0", "2.0.0", false});
     mods.push_back(addon);
 
     auto result = check_dependencies(mods);
@@ -385,9 +383,11 @@ protected:
     fs::path test_dir_;
 
     void SetUp() override {
-        test_dir_ = fs::temp_directory_path() / "iecode_test_mod_packager";
-        fs::remove_all(test_dir_);
-        fs::create_directories(test_dir_);
+        const auto nonce = std::chrono::steady_clock::now().time_since_epoch().count();
+        const auto* test_info = ::testing::UnitTest::GetInstance()->current_test_info();
+        test_dir_ = fs::temp_directory_path() / (std::string("iecode_test_mod_packager_") +
+                                                 test_info->name() + "_" + std::to_string(nonce));
+        ASSERT_TRUE(fs::create_directory(test_dir_));
     }
 
     void TearDown() override {

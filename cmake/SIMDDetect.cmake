@@ -1,3 +1,11 @@
+# Portable release builds retain the architecture baseline instead of requiring AVX2.
+if(NOT IECODE_ENABLE_SIMD)
+    set(IECODE_SIMD_FLAGS "")
+    set(IECODE_HAS_AVX2 FALSE)
+    set(IECODE_HAS_SSE42 FALSE)
+    return()
+endif()
+
 # ── SIMD detection (AVX2 / SSE4.2 / SSE2) ───────────────────────────
 include(CheckCXXCompilerFlag)
 

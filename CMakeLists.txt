@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(iecode VERSION 2026.9.29 LANGUAGES C CXX)
+project(iecode VERSION 2026.10.3 LANGUAGES C CXX)
 
 # ── C++ / C standards ─────────────────────────────────────────────
 set(CMAKE_CXX_STANDARD 20)
@@ -13,6 +13,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # ── Build options ──────────────────────────────────────────────────
+option(IECODE_ENABLE_SIMD "Enable compiler-specific SIMD requirements" ON)
 option(IECODE_UNITY_BUILD     "Enable Unity (jumbo) builds for faster compilation" ON)
 option(IECODE_LTO             "Enable Link-Time Optimization in Release"           ON)
 option(IECODE_CLANG_TIDY      "Enable clang-tidy static analysis"                  OFF)
@@ -141,14 +142,15 @@ target_include_directories(tinygltf::tinygltf
 set(tinygltf_FOUND TRUE)
 find_package(directxtex  CONFIG REQUIRED)
 find_package(glm         CONFIG REQUIRED)
-find_package(assimp      CONFIG REQUIRED)
 
 # ── vcpkg packages (render / scripting) ───────────────────────────
 find_package(bgfx  CONFIG REQUIRED)
 # Bullet3 — backend physique (remplace PhysX 3.4 de nie.exe)
-find_package(Bullet CONFIG REQUIRED)
-find_package(sol2  CONFIG REQUIRED)
-find_package(unofficial-lua CONFIG REQUIRED)
+if(IECODE_BUILD_ENGINE OR IECODE_BUILD_GAME)
+    find_package(Bullet CONFIG REQUIRED)
+    find_package(sol2 CONFIG REQUIRED)
+    find_package(unofficial-lua CONFIG REQUIRED)
+endif()
 
 # ── Image encoding ─────────────────────────────────────────────────
 find_package(WebP CONFIG REQUIRED)
@@ -238,6 +240,7 @@ endif()
 add_subdirectory(third_party)
 
 # ── Project targets ────────────────────────────────────────────────
+enable_testing()
 add_subdirectory(src)
 if(IECODE_BUILD_ENGINE)
     add_subdirectory(src/engine)
@@ -273,9 +276,7 @@ message(STATUS "  iecode_engine:  ${IECODE_BUILD_ENGINE} (lives:: layer)")
 message(STATUS "  iecode_game:    ${IECODE_BUILD_GAME} (game:: layer)")
 message(STATUS "  tinygltf:       ${TINYGLTF_INCLUDE_DIR}")
 message(STATUS "  directxtex:     ${directxtex_FOUND}")
-message(STATUS "  assimp:         ${assimp_FOUND}")
 message(STATUS "  bgfx:           ${bgfx_FOUND}")
-message(STATUS "  sol2:           ${sol2_FOUND}")
 message(STATUS "  Rizin:          ${RIZIN_FOUND}")
 message(STATUS "  Platform:       ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_VERSION}")
 message(STATUS "")

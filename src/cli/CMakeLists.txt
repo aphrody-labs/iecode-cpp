@@ -1,5 +1,6 @@
 # ── iecode CLI executable ────────────────────────────────────────────
 add_executable(iecode_cli)
+target_compile_definitions(iecode_cli PRIVATE IECODE_VERSION="${PROJECT_VERSION}")
 
 file(GLOB_RECURSE CLI_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
