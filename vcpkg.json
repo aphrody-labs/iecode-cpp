@@ -59,6 +59,24 @@
         }
       ]
     },
+    "emu-host": {
+      "description": "Bun OS emulator host (packages/bun-emu-host): Qt 6 Core/Gui with the offscreen platform for headless C++ emulator cores.",
+      "dependencies": [
+        {
+          "name": "qtbase",
+          "default-features": false,
+          "features": [
+            "gui",
+            "thread",
+            "concurrent"
+          ]
+        },
+        {
+          "name": "dirent",
+          "platform": "windows"
+        }
+      ]
+    },
     "iecode-cpp": {
       "description": "IECODE native core, CLI and tests (engine/game disabled).",
       "dependencies": [
