@@ -68,10 +68,10 @@ void iecode_homebrew_poll_input(iecode_home_input *out_input) {
 void iecode_homebrew_wait_vblank(void) { swiWaitForVBlank(); }
 
 int main(void) {
-    iecode_homebrew_input input = {0};
+    iecode_home_input input = {0};
     (void)iecode_homebrew_init();
-    iprintf("IECODE C ABI %lu\n", (unsigned long)iecode_homebrew_abi_version());
-    iprintf("DS/DSi: dual 256x192 screens\nA/B/X/Y: buttons\nTouch the lower screen.\n");
+    printf("IECODE C ABI %lu\n", (unsigned long)iecode_homebrew_abi_version());
+    printf("DS/DSi: dual 256x192 screens\nA/B/X/Y: buttons\nTouch the lower screen.\n");
     for (;;) {
         iecode_homebrew_poll_input(&input);
         if ((input.pressed & IECODE_HOME_BUTTON_START) != 0) break;
