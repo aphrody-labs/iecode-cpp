@@ -5,7 +5,7 @@
  * @brief Authoritative port of the Inazuma Eleven: Victory Road PRNG (lives::CRand / nie.exe:0x14081c200).
  *
  * Canonical 32-bit Mersenne Twister MT19937 with Lemire bounded rejection.
- * Byte-exact cross-language parity with Rust aphrody-nie-core, .NET 10 IECODE.Core,
+ * Byte-exact cross-language parity with Rust nie-core, .NET 10 IECODE.Core,
  * Python niepy, and Bun / TypeScript Inagle.
  */
 

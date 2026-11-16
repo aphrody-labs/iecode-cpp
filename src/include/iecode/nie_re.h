@@ -6,7 +6,7 @@
  *
  * Exposes binary anchors, function addresses, RTTI classes, cryptographic keys,
  * and memory structures discovered across Ghidra, .pdata analyses, and runtime debugging.
- * Cross-language parity with Rust aphrody-nie-re, TypeScript @rosegriffon/inagle,
+ * Cross-language parity with Rust rg-re, TypeScript @rosegriffon/inagle,
  * .NET 10 IECODE.Core, and Python niepy.
  */
 

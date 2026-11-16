@@ -18,7 +18,7 @@ extern "C" {
 #endif
 
 /**
- * @brief Canonical 28 VFS format discriminants matching Rust aphrody-nie-formats.
+ * @brief Canonical 28 VFS format discriminants matching Rust nie-formats.
  */
 typedef enum iecode_format_id {
     IECODE_FORMAT_UNKNOWN = 0,
