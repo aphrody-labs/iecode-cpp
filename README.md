@@ -1,33 +1,58 @@
-# IECODE C++ toolkit
+# iecode-cpp
 
-This directory is the C/C++ surface of the unified IECODE workspace. Rust owns the canonical
-portable capability API; C/C++ supplies native parsers, conversion tools and compatibility
-implementations behind the common CMake/FFI boundary. IEVR/Victory Road runtime ownership stays
-in the sibling `nie` workspace.
+IECODE native toolkit in C++20: parsers, converters, decompilation helpers, the `iecode` command line
+and its HTTP `serve` command, and a GoogleTest suite, for Inazuma Eleven Victory Road (IEVR) and
+sibling Level-5 games. It was extracted with its history from `tools/iecode-cpp` of the Rose Griffon
+monorepo (last tree there: `a8ed41ad`).
 
-## Scope
+This repository contains no game data. Everything is read from an installation you own.
 
-- `src/`: C/C++ parsers, converters, CLI, decompilation helpers, and tests.
-- `cmake/`, `CMakeLists.txt`, `vcpkg.json`: native build configuration.
-- `bench/cpp/`: benchmark harness.
-- `mods/strikers2013-xtreme/`: Kamek/CodeWarrior PowerPC sources of the Inazuma Eleven GO
-  Strikers 2013 Xtreme mod. It is built with its own `build.py` toolchain, is outside the CMake
-  source glob, and its managed playlist helper lives in `src/IECODE/Gui/PlaylistMaker`.
+## Layout
 
-This repository contains no game dumps or generated VFS data.
+| Path | What |
+| --- | --- |
+| `src/` | core library, CLI (`src/cli`), decompilation helpers (`src/decomp`), tests (`src/tests`), headers (`src/include`) |
+| `third_party/` | vendored header-only libraries (stb, bcdec, mio, tinygltf) and Lua 5.2.4 |
+| `cmake/` | warning set, SIMD detection, vcpkg overlay ports and triplets |
+| `vcpkg.json` | dependency manifest (feature `iecode-cpp`) with pinned `builtin-baseline` |
+| `homebrew/`, `bench/`, `tools/` | 3DS and NDS homebrew samples, benchmark, tooling |
 
-## Build the native core
+## Build
 
-The vcpkg manifest keeps this package's dependencies in the opt-in `iecode-cpp` feature so
-other workspace consumers do not install them accidentally. Enable that feature when
-configuring CMake:
+Requirements: CMake 3.25+, Ninja, a C++20 compiler (MSVC 19.4x, GCC 13+ or Clang 17+) and vcpkg.
+On Linux install the bgfx system packages first (`libgl1-mesa-dev libx11-dev libxrandr-dev libxi-dev
+libxinerama-dev libxcursor-dev libwayland-dev libegl1-mesa-dev`).
 
-```powershell
-cmake -S packages/iecode-cpp -B packages/iecode-cpp/build `
-  -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
+```sh
+git clone https://github.com/microsoft/vcpkg "$VCPKG_ROOT" && git -C "$VCPKG_ROOT" checkout 58845ed63eb19aff55e896ea1f5d51f2a0df5b66
+"$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics        # bootstrap-vcpkg.bat on Windows
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
   -DVCPKG_MANIFEST_FEATURES=iecode-cpp
-cmake --build packages/iecode-cpp/build --config Debug
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
-Without `-DVCPKG_MANIFEST_FEATURES=iecode-cpp`, vcpkg sees an empty default feature set and
-CMake later fails at the first required dependency (`CLI11`).
+Without `-DVCPKG_MANIFEST_FEATURES=iecode-cpp` vcpkg installs nothing and CMake stops at the first
+required dependency (`CLI11`). Heavy builds belong in CI or on the build host (`ssh fr1`).
+
+## Run
+
+```sh
+build/src/cli/iecode --help
+build/src/cli/iecode serve --data /path/to/exported/data --port 3000 --host 0.0.0.0
+```
+
+`serve` is a read-only JSON API over a directory of exported game data (`--data`, default `data`):
+`GET /` (version and stats), `/characters`, `/enriched`, `/skills`, `/items`, `/teams`, `/quests`, `/passives`,
+`/tactics`, `/formations`, `/basara`, `/auras`, `/search`, `/constellations`, `/series` and more, each
+list route with a `/<name>/<id>` detail route where it applies. `GET /` returns the version and the size of every loaded table.
+
+## Release
+
+Push a tag `vX.Y.Z`. The `release` workflow builds `iecode` in Release for `linux-x64` and `win-x64`
+and attaches the archives and `SHA256SUMS` to the GitHub Release.
+
+## License
+
+MIT, see `LICENSE`. Vendored sources keep their own terms (`third_party/`).

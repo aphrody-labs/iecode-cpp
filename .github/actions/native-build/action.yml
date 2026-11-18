@@ -1,0 +1,52 @@
+name: native build
+description: Configure and build iecode with vcpkg pinned at the manifest builtin-baseline.
+inputs:
+  build-type:
+    description: CMake build type
+    default: Release
+  lto:
+    description: IECODE_LTO value (ON or OFF)
+    default: "OFF"
+runs:
+  using: composite
+  steps:
+    - name: System packages (Linux)
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends ninja-build pkg-config autoconf automake libtool bison flex \
+          libgl1-mesa-dev libx11-dev libxrandr-dev libxi-dev libxinerama-dev libxcursor-dev libxext-dev \
+          libwayland-dev libegl1-mesa-dev libxkbcommon-dev
+    - name: MSVC environment (Windows)
+      if: runner.os == 'Windows'
+      uses: ilammy/msvc-dev-cmd@a102174a2b586eec2ea151a69e6fd14404a8ce7c # v1.13.0
+    - name: vcpkg at the manifest baseline
+      shell: bash
+      run: |
+        set -euo pipefail
+        baseline=$(sed -n 's/.*"builtin-baseline": *"\([0-9a-f]*\)".*/\1/p' vcpkg.json)
+        git clone --quiet https://github.com/microsoft/vcpkg "$RUNNER_TEMP/vcpkg"
+        git -C "$RUNNER_TEMP/vcpkg" checkout --quiet "$baseline"
+        if [ "$RUNNER_OS" = "Windows" ]; then "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.bat" -disableMetrics; else "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics; fi
+        echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
+        echo "VCPKG_DEFAULT_BINARY_CACHE=$RUNNER_TEMP/vcpkg-bincache" >> "$GITHUB_ENV"
+        mkdir -p "$RUNNER_TEMP/vcpkg-bincache"
+        if [ "$RUNNER_OS" = "Windows" ]; then triplet=x64-windows-static-md; else triplet=x64-linux; fi
+        echo "TRIPLET=$triplet" >> "$GITHUB_ENV"
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/vcpkg-bincache
+        key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'cmake/overlay-ports/**') }}
+        restore-keys: vcpkg-${{ runner.os }}-
+    - name: Configure
+      shell: bash
+      run: |
+        cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ inputs.build-type }} \
+          -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+          -DVCPKG_MANIFEST_FEATURES=iecode-cpp \
+          -DVCPKG_TARGET_TRIPLET="$TRIPLET" -DVCPKG_HOST_TRIPLET="$TRIPLET" \
+          -DIECODE_LTO=${{ inputs.lto }}
+    - name: Build
+      shell: bash
+      run: cmake --build build --parallel

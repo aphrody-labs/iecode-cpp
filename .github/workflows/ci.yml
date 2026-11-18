@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: build and test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/native-build
+      - name: Test
+        shell: bash
+        run: ctest --test-dir build --output-on-failure --timeout 300
+      - name: CLI smoke
+        shell: bash
+        run: |
+          bin=$(find build -name 'iecode' -type f -o -name 'iecode.exe' -type f | head -n 1)
+          "$bin" --help

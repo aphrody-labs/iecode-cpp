@@ -9,3 +9,13 @@ obj/
 target/
 node_modules/
 __pycache__/
+
+# Local state and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.claude/settings.local.json
+vcpkg_installed/
+dist/

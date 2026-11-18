@@ -1,0 +1,11 @@
+# Naming declaration of this repository (scheme: aphrody-labs/.github naming/NAMING.md). Names come from here, never from another repository.
+id = "iecode-cpp"
+kind = "app"
+org = "aphrody-labs"
+
+[names]
+# The IECODE_* CMake options and variables predate the scheme and are read as is.
+env_prefix = "IECODE_"
+
+[legacy]
+binary = ["iecode"]
